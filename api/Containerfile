@@ -7,7 +7,7 @@ RUN apk add cargo curl jq
 RUN npm config set update-notifier false
 
 ADD https://github.com/mempool/mempool/archive/refs/tags/v${VERSION}.tar.gz .
-RUN mkdir -p /source && tar -xzvf v${VERSION}.tar.gz --strip-components 1 -C /source
+RUN mkdir -p /source && tar -xzf v${VERSION}.tar.gz --strip-components 1 -C /source
 
 ## Build rbt plugin
 WORKDIR /source/rust/gbt

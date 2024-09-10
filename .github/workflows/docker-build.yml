@@ -47,3 +47,17 @@ jobs:
             --tag ghcr.io/jmanero/mempool/api:${{ env.major_version }}.${{ env.minor_version }}\
             --tag ghcr.io/jmanero/mempool/api:${{ env.major_version }}.${{ env.minor_version }}-${{ github.sha }}\
             --file Containerfile .
+
+      - name: Build and Push Web Image
+        working-directory: ./web
+        run: |
+          docker buildx build --push --pull\
+            --platform linux/amd64,linux/arm64\
+            --build-arg VERSION=${{ env.major_version }}.${{ env.minor_version }}\
+            --label "org.label-schema.vcs-ref=${{ github.sha }}"\
+            --label "org.label-schema.version=${{ env.major_version }}.${{ env.minor_version }}"\
+            --tag ghcr.io/jmanero/mempool/web:latest\
+            --tag ghcr.io/jmanero/mempool/web:${{ env.major_version }}\
+            --tag ghcr.io/jmanero/mempool/web:${{ env.major_version }}.${{ env.minor_version }}\
+            --tag ghcr.io/jmanero/mempool/web:${{ env.major_version }}.${{ env.minor_version }}-${{ github.sha }}\
+            --file Containerfile .

@@ -30,7 +30,6 @@
   window.__env.PUBLIC_ACCELERATIONS = ${ __PUBLIC_ACCELERATIONS__ };
   window.__env.SERVICES_API = '${__SERVICES_API__}';
 
-  // FIXME: Insert values at build time
   window.__env.GIT_COMMIT_HASH = '${__GIT_COMMIT_HASH__}';
   window.__env.PACKAGE_JSON_VERSION = '${__MEMPOOL_VERSION__}';
 }(this));
