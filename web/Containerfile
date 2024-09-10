@@ -1,0 +1,40 @@
+ARG VERSION=3.0.0
+
+FROM docker.io/library/node:20-alpine AS build
+ARG VERSION
+
+RUN apk add curl jq
+RUN npm config set update-notifier false
+
+ADD https://github.com/mempool/mempool/archive/refs/tags/v${VERSION}.tar.gz .
+RUN mkdir -p /source && tar -xzvf v${VERSION}.tar.gz --strip-components 1 -C /source
+
+WORKDIR /source/frontend
+RUN --mount=type=cache,target=/root/.cache --mount=type=cache,target=/root/.npm npm install --no-fund
+
+RUN /usr/local/bin/node generate-config.js
+RUN --mount=type=cache,target=/source/frontend/.angular/cache ./node_modules/.bin/ng build --verbose --configuration production --localize
+RUN cp -avR src/resources dist/mempool/browser/resources
+RUN /usr/local/bin/node sync-assets.js dist/mempool/browser/resources/
+RUN npm run build-mempool-js
+
+## Get the release's git commit hash. Place into an environment script to render configuration at runtime
+RUN curl --fail https://api.github.com/repos/mempool/mempool/commits/v${VERSION} | jq --raw-output --arg version "${VERSION}" '"__GIT_COMMIT_HASH__=\"\(.sha)\"; export __GIT_COMMIT_HASH__\n__MEMPOOL_VERSION__=\"\($version)\"; export __MEMPOOL_VERSION__\n"' >version.envsh
+
+FROM docker.io/library/nginx:stable-alpine
+ARG VERSION
+
+COPY --from=build /source/frontend/dist/mempool/browser /var/www/mempool
+COPY site/nginx.conf /etc/nginx/
+COPY site/mempool.conf.template /etc/nginx/templates/
+
+RUN mkdir -p /etc/mempool
+COPY config.template.js /etc/mempool/
+COPY configure.sh /docker-entrypoint.d/10-configure-mempool.sh
+COPY --from=build /source/frontend/version.envsh /docker-entrypoint.d/09-mempool-version.envsh
+
+ENV MEMPOOL_VERSION=${VERSION}
+ENV MEMPOOL_LISTEN=8080
+ENV MEMPOOL_API="http://127.0.0.1:8999"
+ENV MEMPOOL_ENVSUBST_OUTPUT_DIR=/var/run/mempool
+ENV NGINX_ENVSUBST_OUTPUT_DIR=/var/run/nginx/conf.d

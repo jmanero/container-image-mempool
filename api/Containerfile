@@ -1,0 +1,45 @@
+ARG VERSION=3.0.0
+
+FROM docker.io/library/node:20-alpine AS build
+ARG VERSION
+
+RUN apk add cargo curl jq
+RUN npm config set update-notifier false
+
+ADD https://github.com/mempool/mempool/archive/refs/tags/v${VERSION}.tar.gz .
+RUN mkdir -p /source && tar -xzvf v${VERSION}.tar.gz --strip-components 1 -C /source
+
+## Build rbt plugin
+WORKDIR /source/rust/gbt
+RUN npm install --no-save --no-fund --ignore-scripts @napi-rs/cli@2.18.0
+RUN ./node_modules/.bin/napi build --platform --release --strip
+
+## Build backend service distribution
+WORKDIR /source/backend
+RUN npm install --omit=dev --omit=optional --no-fund --ignore-scripts
+
+## Insert rbt outputs into backend node_modules (npm install creates a symlink to local dependencies)
+RUN rm node_modules/rust-gbt && mkdir node_modules/rust-gbt &&\
+  cp ../rust/gbt/index.js ../rust/gbt/index.d.ts ../rust/gbt/package.json ../rust/gbt/*.node node_modules/rust-gbt/
+
+## Transpile TypeScript
+RUN ./node_modules/.bin/tsc -p tsconfig.build.json
+
+## Remove build dependencies from node_modules
+RUN rm -rf node_modules/typescript node_modules/@typescript-eslint node_modules/@napi-rs
+
+## Insert node_modules, static metadata, and configuration template into dist output
+RUN cp -R node_modules dist/
+RUN cp /source/docker/backend/mempool-config.json ./dist/config.json.template
+RUN cp ./src/tasks/price-feeds/mtgox-weekly.json ./dist/tasks
+
+## Get git commit information from GH
+RUN curl https://api.github.com/repos/mempool/mempool/commits/v${VERSION} | jq --arg version ${VERSION} '{version: $version, gitCommit: .sha}' > dist/api/version.json
+
+## Output Image
+FROM docker.io/library/node:20-alpine
+
+COPY --from=build /source/backend/dist /opt/mempool
+COPY entrypoint.sh /opt/mempool
+
+ENTRYPOINT [ "/opt/mempool/entrypoint.sh" ]

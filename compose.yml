@@ -1,0 +1,84 @@
+---
+services:
+  web:
+    environment:
+      MEMPOOL_LISTEN: "8080"
+      MEMPOOL_API: "http://api:8999"
+
+    image: jmanero/mempool/web:latest
+    pull_policy: build
+    build:
+      context: web
+      dockerfile: Containerfile
+
+    restart: on-failure
+    stop_grace_period: 1m
+    depends_on:
+      - api
+
+    ports:
+      - 8080:8080
+    tmpfs:
+      - /tmp
+      - /var/run
+
+  api:
+    environment:
+      MEMPOOL_CACHE_DIR: /data/cache
+      MEMPOOL_STDOUT_LOG_MIN_PRIORITY: debug
+
+      MEMPOOL_BACKEND: electrum
+      ELECTRUM_HOST: "100.90.198.2"
+      ELECTRUM_TLS_ENABLED: "true"
+
+      CORE_RPC_HOST: "172.24.207.118"
+      CORE_RPC_PORT: "8332"
+      CORE_RPC_USERNAME: "local"
+      CORE_RPC_PASSWORD: "local"
+
+      DATABASE_ENABLED: "true"
+      DATABASE_HOST: "db"
+      DATABASE_DATABASE: "mempool"
+      DATABASE_USERNAME: "mempool"
+      DATABASE_PASSWORD: "mempool"
+
+      STATISTICS_ENABLED: "true"
+
+    image: jmanero/mempool/api:latest
+    pull_policy: build
+    build:
+      context: api
+      dockerfile: Containerfile
+
+    restart: on-failure
+    stop_grace_period: 1m
+    depends_on:
+      db:
+        condition: service_healthy
+
+    ports:
+      - 8999:8999
+    volumes:
+      - ./data/api:/data
+    tmpfs:
+      - /tmp
+
+  db:
+    environment:
+      MYSQL_DATABASE: "mempool"
+      MYSQL_USER: "mempool"
+      MYSQL_PASSWORD: "mempool"
+      MYSQL_ROOT_PASSWORD: "admin"
+
+    image: mariadb:10.6-ubi9
+
+    restart: on-failure
+    stop_grace_period: 1m
+    healthcheck:
+      test: ["CMD", "/usr/local/bin/healthcheck.sh", "--connect", "--innodb_initialized", "--innodb_buffer_pool_loaded"]
+      interval: 10s
+      timeout: 30s
+      retries: 3
+
+    volumes:
+      - ./data/db:/var/lib/mysql
