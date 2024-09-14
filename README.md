@@ -3,7 +3,7 @@ mempool.space Container Image Build
 
 Simplified container image builds for `mempool/frontend` and `mempool/backend`
 
-~[Unwinding NPM builds](./doc/npm.jpg)
+![Unwinding NPM builds](./doc/npm.jpg)
 
 The container images produced by this configuration should behave more or less the same as those published to [hub.docker.com](https://hub.docker.com/u/mempool) by the [mempool.space](https://mempool.space/about) team. Changes include:
 
